@@ -90,6 +90,7 @@ int v4l2_set_input(v4l2device *dev) {
 		print_debug("Error selecting input %d", count);
 		return 1;
 	}
+	return 0;
 }
 
 int v4l2_set_pixfmt(v4l2device *dev) {
@@ -208,6 +209,7 @@ int prepare_cap(v4l2device *dev) {
 		perror("VIDIOC_STREAMON");
 		return 1;
 	}
+	return 0;
 }
 
 int stop_capturing(v4l2device *dev) {
@@ -388,6 +390,7 @@ int main(int argc, char* argv[]) {
 	v4l2device *dev;
 	dev = malloc(sizeof(v4l2device));
 	CLEAR(*dev);
+	unsigned int retcode = 0;
 	
 	// default values
 	dev->fd = -1;
@@ -412,6 +415,7 @@ int main(int argc, char* argv[]) {
 	dev->fd = open(dev->in_devname, O_RDWR | O_NONBLOCK, 0);
 	if (dev->fd == -1) {
 		perror("Opening video device");
+		retcode = 1;
 		goto FINISH;
 	}
 	
@@ -422,21 +426,26 @@ int main(int argc, char* argv[]) {
 // 	check device capabilites 
 	v4l2_capabilities(dev);
 // 	set input
-	v4l2_set_input(dev);
+	retcode = v4l2_set_input(dev);
+	if (retcode) goto FINISH;
 // 	set pixformat
-	if (v4l2_set_pixfmt(dev)) goto FINISH;
+	retcode = v4l2_set_pixfmt(dev);
+	if (retcode) goto FINISH;
 // 	set framerate
-	if (v4l2_set_fps(dev)) goto FINISH;
+	retcode = v4l2_set_fps(dev);
+	if (retcode) goto FINISH;
 // 	allocate buffers
-	if (v4l2_init_mmap(dev)) goto FINISH;
+	retcode = v4l2_init_mmap(dev);
+	if (retcode) goto FINISH;
 // 	prepare to grab frames
-	prepare_cap(dev);
+	retcode = prepare_cap(dev);
+	if (retcode) goto FINISH;
 	// configure virtual video device
 	if (*dev->out_devname != '-') {
-		if (v4l2loopbackDevice(dev)) goto FINISH;
+		retcode = v4l2loopbackDevice(dev);
+		if (retcode) goto FINISH;
 	}
 	print_debug("capturing..\n");
-	int retcode = 0;
 	while (running) {
 		retcode = grabFrame(dev);
 		if (retcode) running = 0;
@@ -446,6 +455,5 @@ int main(int argc, char* argv[]) {
 	close(dev->fd);
 	if (dev->fdout_devname > 0) close(dev->fdout_devname);
 	free(dev);
-	return 0;
+	return retcode;
 }
- 
