@@ -255,8 +255,15 @@ int grabFrame(v4l2device *dev) {
 	buf.memory = V4L2_MEMORY_MMAP;
 	// dequeue buffer
 	if (xioctl(dev->fd, VIDIOC_DQBUF, &buf) < 0) {
-		perror("VIDIOC_DQBUF");
-		return 1;
+		switch(errno) 
+		{
+			case EAGAIN:
+				return 0;
+			case EIO:
+			default:
+				perror("VIDIOC_DQBUF");
+				return errno;
+        }
 	}
 	assert(buf.index < dev->n_buffers);
 	// processing buffer
@@ -331,7 +338,7 @@ void usage(char *app) {
 	"\t -i <input device>           set input device.  default: /dev/video0\n"
 	"\t -o <output device>          set output device. default: stdout\n" 
 	"\t                             for copying to another device, using v4l2loopback\n"
-	"\t -f <pixformat>              Fourcc format default: YUYV\n"
+	"\t -f <pixformat>              Fourcc format default: UYVY\n"
 	"\t                             for working with gc2035 module, works with: UYVY/YV12/YU12\n"
 	, app);
 	exit(1);
@@ -402,7 +409,7 @@ int main(int argc, char* argv[]) {
 	dev->timeout = 5;
 	dev->in_devname = "/dev/video0";
 	dev->out_devname = "-";
-	dev->fmt = V4L2_PIX_FMT_YUYV;
+	dev->fmt = V4L2_PIX_FMT_UYVY;
 	process_args(argc, argv, dev);
 	
 	// print args
